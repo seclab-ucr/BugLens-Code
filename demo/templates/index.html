@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fuzzy LLM Comparison</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            margin-bottom: 40px;
+        }
+        .heading {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        table {
+            border-collapse: collapse;
+            width: 95%;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background: #f9f9f9;
+        }
+        .green {
+            background-color: #d4edda; /* light green */
+        }
+        .red {
+            background-color: #f8d7da; /* light red */
+        }
+        .all-correct {}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="heading">All Models vs. Ground Truth</div>
+        
+        <!-- Optional: show/hide "all correct" rows -->
+        <label>
+            <input type="checkbox" id="diff-switch" onclick="toggleDifferences()">
+            Show Only Cases Where At Least One Model Is Wrong
+        </label>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Case ID</th>
+                    <th>Ground Truth</th>
+                    <!-- Dynamically generate one <th> per model -->
+                    {% for model_name in model_names %}
+                        <th>{{ model_name }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows_for_table %}
+                    {# First figure out if ALL models are correct #}
+                    <!-- {% set all_correct = true %}
+                    {% for m in model_names %}
+                        {% if not row.results[m].correct %}
+                            {% set all_correct = false %}
+                        {% endif %}
+                    {% endfor %} -->
+
+                    {% set correctness_list = row.results.values()|map(attribute='correct')|list %}
+                    {% set all_correct = correctness_list|length == correctness_list|select('equalto', true)|list|length %}
+
+                    <tr class="{% if all_correct %}all-correct{% endif %}">
+                        <td>{{ row.case_id }}</td>
+                        <td>{{ row.gt }}</td>
+                
+                        {% for m in model_names %}
+                            {# If correct is True => green, otherwise => red #}
+                            {% if row.results[m].correct %}
+                                <td class="green">{{ row.results[m].orig }}</td>
+                            {% else %}
+                                <td class="red">{{ row.results[m].orig }}</td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+        </table>
+        
+        <p>Total Rows: {{ rows_for_table|length }}</p>
+    </div>
+    
+    <div class="container">
+        <div class="heading">Correctness Metrics</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Missed Real Bugs</th>
+                    <th>Mis-labeled FP</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for m in model_names %}
+                <tr>
+                    <td>{{ m }}</td>
+                    <td>{{ model_stats[m].missed_bug }}</td>
+                    <td>{{ model_stats[m].mislabel_fp }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    function toggleDifferences() {
+        const checkbox = document.getElementById("diff-switch");
+        const showOnlyDifferences = checkbox.checked;
+        const rows = document.querySelectorAll("tr.all-correct");
+        
+        rows.forEach((row) => {
+            if (showOnlyDifferences) {
+                row.style.display = "none";
+            } else {
+                row.style.display = "table-row";
+            }
+        });
+    }
+    </script>
+
+</body>
+</html>

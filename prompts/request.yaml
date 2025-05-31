@@ -1,0 +1,577 @@
+infer_variable_name: # infer the variable name in the source code
+  - text: |
+      I have a static analysis tool targeting Linux kernel drivers for tainted-style bugs. The analysis focuses on the propagation of user-controlled values via ioctl and tracks the propagation to global variables and sinks.
+      However, this analysis is mostly based on LLVM IR, so all variables and contexts are in IR form and are hard for humans to recognize. Please help me infer the tainted variable at the source code level. 
+      For each case, we have instructions that indicate the load, store, and other operators of the tainted variable (dataflow of a tainted bug). I will give you the context where the taint happens. 
+      1. All tainted values are either **local variables** "loaded" from globals or parameters, or parameters of the current function
+      2. The tainted value is always a number
+      3. There might exist "name redundancy", meaning you should pay more attention to global variables and their fields
+      4. Please point out the field name of a struct
+      5. For the tainted value to continue to propagate to another non-local variable, you should point out the
+        first locally propagated variable
+      Think line by line, and your first case is:
+      ========================================
+      The bug detector is: {}
+      source code:
+      {}
+      ---------------------------------------
+      Instructions:
+      {}
+      ---------------------------------------
+      line no (in source code): {}
+      ---------------------------------------
+    args:
+      - get_bug_detector
+      - get_function_first_part
+      - get_insts_from_ctx
+      - get_source_line_set
+  - text: |
+      Wrap up our discussion, output the variable in the following format:
+      Besides, please point out the "sink" of this function the "sink" should be the last "line" of the source code, 
+      <infer_res>
+        <tainted_var>the_variable</tainted_var>
+        <sink>some_func(the_variable)</sink>
+      </infer_res>
+smart_bug_analysis: 
+  - text: |
+      I have a static analysis tool designed to detect bugs in Linux kernel drivers. This tool has a high rate of false positives, which is a significant drawback due to its conservative analysis approach.
+      The tool tracks tainted data flows and flags the following types of potential vulnerabilities:
+      1.	**Tainted Arithmetic Operations**: e.g., integer overflows that cause further memory/control flow corruption
+      2.	**Tainted Loop Bound Conditions**: e.g., infinite loops, unexpected iterations with a very large number of iterations, or OOB access.
+      3.	**Tainted Pointer Dereferences**: e.g., arbitrary memory writes/reads in kernel space.
+      4.  **Buffer Overflow**: e.g., out-of-bound memory access.
+      5.  **Tainted length in copy_from_user**: we consider the stack overflow, when the "dest" of copy_from_user is a stack variable, 
+      and the "length" is tainted
+      While these detections identify certain code patterns ("phenomena"), they don't necessarily correspond to actual security concerns, leading to many false positives. For instance, consider the following code: 
+      "`c
+      for(i = 0; i < ARR_SIZE; i++){{
+        if(arr[i].flag == tainted_var){{
+        break;
+      }}
+      }}
+      ```
+      In this example, the loop is flagged for using a tainted variable. However, the taint does not adversely affect the control flow or lead to a security issue; the code operates as intended regardless of the tainted input.
+      Note, in this case, "ARR_SIZE" is a constant. Otherwise, we need to think, is the tainted variable can control the loop bound in all possible configurations/settings?
+
+      **Your Task:**
+      1.	**Analysis Scope**: You will be provided with code snippets flagged by our static analysis tool.
+      2.	**Tainted Variable Assumption**: 
+        2.1: **Threat Model**: we assume the attacker could at most be a root user, but can't control the kernel. (the kernel is not compromised)
+          In other words, if one variable clearly needs a very high capability, e.g., `CAP_SYS_ADMIN`, `CAP_SYS_MODULE`, `CAP_SYS_RAWIO` or `CAP_BPF`,
+           we can assume it cannot be tainted.
+        2.2 Assume the tainted variable can be arbitrarily set by an attacker within the representable range of its data type.
+        2.3 Assume any constraints (e.g., "the user can only input small integers" or "UI only provides a checkbox")
+          or any existing checks are compromised and can be bypassed by the attacker.
+        2.4 This step is only concerned with the nature of the bug/vuln itself, which should be considered a real bug 
+          even though a potential check exists.
+          For example:
+          ```c
+          assert (tainted_var < MAX_SIZE);
+          buf[tainted_var] = 0;
+          ```
+          In this case, even though there's an explicit check, 
+        we still need to mark the potential out of bound access as a "potential bug".
+          The analysis of whether the bug could really happen is NOT YOUR JOB. So just directly ignore any possible checks.
+        2.5 If the sink could be a potential bug, point out in what condition (e.g., the range of the tainted variable) it could be a bug.
+          For buffer overflow due to "copy_from_user", for example, `copy_from_user(dst, src, tainted_size) < 0`, 
+        its "bug condition" is "tainted_size > sizeof(dst)"
+
+      3.	**Objective**: For each code snippet, analyze it step by step to determine whether it represents:
+        3.1 **Potential Bug**: If the tainted variable usage can cause (1) infinite/very-large loop, (2) memory bug: out-of-bound access, buffer overflow, arbitrary memory access                              
+              And the bug happens in the current context (instead of saying the value can be used in the further somewhere else),
+              our sink is the FINAL SINK of the tainted data, it won't be used in other functions or contexts.
+              And only in this case, you can say it to be a "potential bug" and give your reasoning.
+        3.2 **Normal Code**: if the tainted variable usage cannot lead to a security issue, or the concern is out of our scope (loop, and memory bug)
+                 Please attribute it to be "normal code".
+
+      What We Need from You is a step-by-step explanation of how you arrived at "Normal Code" or "Potential Bug."
+
+      Use these guidelines to systematically assess each snippet. If in doubt, lean toward marking something as a "Potential Bug," since at this stage we aim to avoid missing any plausible vulnerabilities.
+      ========================================
+      tainted_varaible: {}
+      bug detector: {}
+      source code 
+      {}
+      ========================================
+
+    args:
+      - get_tainted_value
+      - get_bug_detector
+      - get_function
+  - text: |
+      Summarize our discussion, and respond in a <bug_eval> tag with the following format (vuln type + reason),
+      of course, one single tainted variable may lead multiple vulnerabilities:
+      currently we only consider (1) infinite/very-large loop, (2) out-of-bound access/buffer overflow/arbitrary memory access;
+      for other types of bugs, you can say "normal code" or "not_a_bug"
+      <bug_eval>
+        <tainted_var>tainted_var</tainted_var>
+        <vulns>
+          <vuln>
+            <type> out_of_bound_access </type>
+            <desc> the tainted_var will lead to an out-of-bound access at code `arr[tainted_var]`</desc>
+            <bug_context> arr[tainted_var] = 1 </bug_context>
+            <bug_condition> tainted_var > sizeof(arr) </bug_condition>
+          </vuln>
+        </vulns>
+      </bug_eval>
+      if it can't lead to a bug, you can say <bug_eval>not_a_bug</bug_eval>; otherwise the sink can form a bug, you can say <bug_eval>potential_bug</bug_eval>
+      rarely, you may say <bug_eval><vuln>uncertain</vuln></bug_eval> if some accidental conditions are met
+sanitizer_detection:
+  - text: |
+      I am doing the taint analysis in the Linux kernel; I have a static taint analysis tool that reports some 
+      warnings of tainted bugs, such as integer overflow or potential out-of-bound read/write. 
+
+      However, the warning could be a false positive because of the precision limitation of static analysis. 
+      A typical case is when the vulnerability is already sanitized before the sink; 
+      our static analysis is not path-sensitive, so it still warns us. 
+
+      At first, I want you could analyze any possible preconditions of the sink.
+      Since we always assume the sink is reachable, these preconditions must be satisfied.
+
+      The analysis should be intra-procedural, i.e., if it calls another function, you can simply take a note
+      and no need to consider what happens in the function.
+
+      You're not always expected to give the final answer, if you think you need more information to finish your analysis, 
+      such as struct and global variables, you can always ask me for their definition and continue your analysis
+      using the following format:
+
+      Note:
+      - you can request multiple <request> within only one <requests>, no same request in multiple requests, use <args> to list multiple arguments for one request
+      - please strictly follow the format of the requests, otherwise, I can't parse it
+
+      --- request 1: ask for the struct definition ---
+      You could ask me for the definition of the structure. in this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_struct_def</name>
+          <args>
+            <arg>struct_name_1</arg>
+            <arg>struct_name_2</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 2: ask for the definition of global variables ---
+      You could ask me for the definition of global variables. In this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_global_var_def</name>
+          <args>
+            <arg>global_var_1</arg>
+            <arg>global_var_2</arg>
+          </args>
+        </request>
+      </requests>
+      ========================================
+
+      Before you start, you need to identify the sink of the function.
+      You're supposed to focus on the exact one single sink,
+      which is the last line of the function context what I provided to you.
+
+      You should only consider the following two types of preconditions, essentially it's a reachability check:
+      - direct check (dominate condition)
+        for example, if we have 
+        ```c
+        if (flag){{
+          sink(tainted_var);  
+        }}
+        ```
+      dominate condition can directly dominate the sink, so we need to consider it as a precondition.
+      - early return/bypass (guard condition)
+        Beyond this "direct check", we also need to consider the following "early return/bypass", for example:
+        ```c
+        if (tainted_var > 100)
+          return/goto invalid_label;
+
+        sink(tainted_var);
+        ...
+        invalid_label:
+          return;
+        ```
+        here, the "invalid_label" is a "bypass" to the sink, so we need to consider it as a precondition of the sink:
+        so the precondition of the sink is "tainted_var <= 100" to make the sink reachable.
+
+      guard condition always have a early return or goto to skip the sink, 
+        for other checks but not directly related to the sink, we should ignore them, for example:
+      ```c
+      if (flag2)
+        do_something();
+      sink(tainted_var);
+      ```
+      here, the "flag2" can NOT guard our sink, so we should IGNORE it!
+
+      I hope you can work as a program verifier/symbolic execution engine to analyze the preconditions of the sink.
+      use our guidelines, and think line by line, and your first case is:
+
+      ========================================
+      sink variable
+      {}
+      sink context (the full context of the function):
+      {}
+      ========================================
+
+      if you can't attribute a condition to "dominate condition" or "guard condition", you can ignore it.
+
+      after your analysis, you should summarize the preconditions of the sink in the following format:
+      ```xml
+      <sink_precondi>
+       <precondi>
+        <type> dominate_condition </type>
+        <condition> flag </condition>
+        <dominated_sink> if(flag) sink(tainted_var) </dominated_sink>
+       </precondi>
+       <precondi>
+        <type> guard_condition </type>
+        <condition> tainted_var <= 100 </condition>
+        <guard_bypass> if (tainted_var > 100) return/goto invalid_label; </guard_bypass>
+       </precondi>
+      </sink_precondi>
+      ```
+      Note: you can have multiple preconditions for the sink, and they can be combined with "AND" logic.
+    args:
+      - get_tainted_value
+      - get_function
+    callback:
+      - need_struct_def
+      - need_global_var_def
+  - text: |
+      Next, please help me find if there are range constraints *for this tainted variable* along the call chain (interprocedually). 
+      By default, I will provide the function code and the source code from the function start to the sink.
+      ========================================
+      tainted_variable: {}
+      current callchain: {}
+      context of the sink:
+      {}
+      ========================================
+      You should be careful about the data flow of the tainted variable in the call chain cuz it may have different names in different contexts.
+
+      In this step, please consider every possible value range constraints that applies to the tainted variable.
+      You are NOT expected to analyze whether the they really work (i.e., whether the bug is eliminated); just find them.
+
+      First of all, the detection must based on the exisiting function call chain, rather than the your knowledge about the function definition.
+      As our target project is different from the version of the project you are familiar with.
+      Also, you can request for the definition of the function (see "request 1: ask for the function definition" below)
+
+      There's some knowledge for you to find the range constraints:
+      - There're essentially three types of constraints: 
+         a. Validation: reject invalid range, the tainted variable without expected range can't reach our sink,
+            e.g., if (tainted_var < 0) return -EINVAL; or, if (tainted_var > 0) go_to_our_sink();
+         b. Sanitization: correct the tainted value, the tainted variable can be corrected when it reaching our sink, 
+            e.g., tainted_var = min(tainted_var, 100);
+         c. type information. If a variable is an "unsigned integer," then it definitely>=0;
+            Also, a "uint8" can ensure the value is in the range [0, 255]. The type of information effectively limits the value range of the tainted variable.
+      - transferability of the constraints: the constraints may not be directly applied to the tainted variable, 
+        but sometimes they can be transferred to the tainted variable through the function call chain. For example, Let's consdier `var = tainted_var + 1` 
+          a. the validation is transferable, which means, for example, `if (var < 0) return -EINVAL;` means 
+            `if (tainted_var + 1 < 0) return -EINVAL;`
+          b. the sanitzation is not transferable, which means, for example, `var = min(var, 100);` doesn't enforce 
+            the tainted value to be in the range [0, 99]
+      - multiple tainted varaibles are possible, the source might be a struct, or propagate to multiple vars
+      - In this step, you should only focus on the **detection** of the range constraints, no need for further analysis
+
+      If you think you need more information to finish your analysis, such as function definition, struct, and global variables, you should response with the following requests to get 
+      more information and I will provide them back to you to let you continue the analysis:
+      Note:
+        - you can request multiple <request> within only one <requests>, no same request in multiple requests, use <args> to list multiple arguments for one request
+        - please strictly follow the format of the requests, otherwise, I can't parse it
+      
+      --- request 1: ask for the function definition ---
+      You could ask me for the definition of the function. in this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_func_def</name>
+          <args>
+            <arg>func_1</arg>
+            <arg>func_2</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 2: ask for the struct definition ---
+      You could ask me for the definition of the structure. in this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_struct_def</name>
+          <args>
+            <arg>struct_name_1</arg>
+            <arg>struct_name_2</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 3: ask for the caller of the current function ---
+      You could ask me for the caller for the current function. (Note: you can only request one caller at a time)
+       in this case, you could respond with the following:
+       <requests>
+        <request>
+          <name>need_caller</name>
+          <args>
+            <arg>current_function_name</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 4: ask for the definition of global variables ---
+      You could ask me for the definition of global variables. In this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_global_var_def</name>
+          <args>
+            <arg>global_var_1</arg>
+            <arg>global_var_2</arg>
+          </args>
+        </request>
+      </requests>
+      ---------------------------------------
+      After your finding, i.e., you already get enough information to finish your analysis,
+       you should add the range constraints you found in the following format at the end of your response,
+      the <type> is the type of the constraint, which can be "validation", "sanitization", or "type_constraint",
+      the <handler_func> is the function that handles the constraint, and the <context> is the context of the source code showing how the constraint works
+      NOTE: NO NEED TO ANALYZE THE CONSTRAINTS, JUST COLLECT THEM, WE'LL ANALYZE THEM LATER
+      ---------------------------------------
+      <range_constraints>
+        <constraint>
+          <type>validation</type>
+          <handler_func>func_1</handler_func>
+          <context>the_context_of_the_constraint</context>
+        </constraint>
+      </range_constraints>
+      ---------------------------------------
+      To save tokens and time, let's remove the range constraints if its "constrained_var" is clearly not relevant to our tainted variable.
+    args:
+      - get_tainted_value
+      - get_call_chain
+      - get_function_first_part
+    callback:
+      - need_func_def
+      - need_caller
+      - need_struct_def
+      - need_global_var_def
+  - text: |
+      First of all, you're no need to finish the task at very first, you can always ask for more information:
+      you should ask for more information by using the following format. In this case, you shouldn't
+      reach a conclusion, ask me for more information to help you, so you can analyze again 
+      once you get the information you need back from me.
+      --- request 1: ask for the function definition ---
+      You could ask me for the definition of the function. in this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_func_def</name>
+          <args>
+            <arg>func_1</arg>
+            <arg>func_2</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 2: ask for the struct definition ---
+      You could ask me for the definition of the structure. in this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_struct_def</name>
+          <args>
+            <arg>struct_name_1</arg>
+            <arg>struct_name_2</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 3: ask for the caller of the current function ---
+      You could ask me for the caller for the current function. (Note: you can only request one caller at a time)
+       in this case, you could respond with the following:
+       <requests>
+        <request>
+          <name>need_caller</name>
+          <args>
+            <arg>current_function_name</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 4: ask for the definition of global variables ---
+      You could ask me for the definition of global variables. In this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_global_var_def</name>
+          <args>
+            <arg>global_var_1</arg>
+            <arg>global_var_2</arg>
+          </args>
+        </request>
+      </requests>
+      ========================================
+      
+      Now it's time to look back to these possible range constraints you just found and analyze their preconditions 
+        and postconditions.
+      In this step, I want you can work as a program verifier/symblic execution engine,
+      to infer the precondition and postcondition of these constraints.
+
+    
+      We can apply simple rules to analyze the precondition and postcondition of the constraints:
+        - The precondition is the path-condition to make the constraint reachable, and the postcondition is the effect of the constraint on the tainted variable
+        - The precondition should be an expression of variables, and the postcondition should be a range of the tainted variable
+        - For example, `if(config) constraint(x);`
+          we must consider both branches are possible to reach
+            for example, if we have the following code:
+            ```c
+            void check_tainted_value(int config, int other_config, int x){{
+              if (other_config == CHECK_SKIP)
+                return;
+              if (config == 1)
+                assert(x > 0 && x < 100);
+              else if (config == 2)
+                assert(x > 0);
+            }}
+            ```
+            there are actually **following** [precondition, postcondition] pairs:
+            - [other_config == CHECK_SKIP, x in (-inf, +inf)]
+            - [other_config != CHECK_SKIP && config == 1, x in (0, 100)]
+            - [other_config != CHECK_SKIP && config == 2, x in (0, +inf)]
+            - [other_config != CHECK_SKIP && config != 1 && config != 2, x in (-inf, +inf)]
+          The most notable thing is that we have to consider every possible "early return" in the function,
+          i.e, the "other_config == CHECK_SKIP" in this case. It can bypass the following constraints.
+          So we have to add "other_config != CHECK_SKIP" as a precondition of the constraint.
+        - You should pay more attention to the "bypass" of our constraint
+          A typical bypass is like:
+          "`c
+          if (some_other_condition)
+            return do_other_thing(tainted_var);
+
+          assert(tainted_var < 100)
+          ```
+          In this case, there's constraint ("assert") tries to limit the range of the tainted variable, 
+            but the other branch, "some_other_condition"
+           might bypass the check w/o reaching our constraint. Therfore, the precondition is, so far, "!some_other_condition",
+           it means, to make the constraint reachable, the "some_other_condition" should be false.
+
+      After your finding, i.e., you have enough information about the entire project code to finish your analysis,
+      NOTE: the preconditions are always path constraint! NEVER SAY "something must executed successfully" or "something must be true",
+        you should always use the statement inside the "if" statement to describe the precondition
+      you should add the preconditions and postconditions you found in the following format at the end of your response:
+         ```xml
+        <range_constraint>
+          <type>validation</type>
+          <handler_func>check_tainted_value</handler_func>
+          <condition_pairs>
+          <pair>
+            <precondi>other_config == CHECK_SKIP</precondi>
+            <postcondi>x in (-inf, +inf)</postcondi>
+            <context> if (other_config == CHECK_SKIP) return; </context>
+          </pair>
+          <pair>
+            <precondi>other_config != CHECK_SKIP && config == 1</precondi>
+            <postcondi>x in (0, 100)</postcondi>
+            <context> if (config == 1) assert(x > 0) && (x < 100); </context>
+          </pair>
+          <pair>
+            <precondi>other_config != CHECK_SKIP && config == 2</precondi>
+            <postcondi>x in (0, +inf)</postcondi>
+            <context> else if (config == 2) assert(x > 0); </context>
+          </pair>
+          <pair>
+            <precondi>other_config != CHECK_SKIP && config != 1 && config != 2</precondi>
+            <postcondi>x in (-inf, +inf)</postcondi>
+            <context> induced by the other branches </context>
+          </pair>
+          </condition_pairs>
+        </range_constraint>
+        ````
+    args:
+      - get_analysis_result
+    callback:
+      - need_func_def
+      - need_struct_def
+      - need_global_var_def
+      - need_caller
+
+  - text: |
+      First of all, you're no need to finish the task at very first, you can always ask for more information:
+      you should ask for more information by using the following format. In this case, you shouldn't
+      reach a conclusion, ask me for more information to help you, so you can analyze again 
+      once you get the information you need back from me.
+      --- request 1: ask for the function definition ---
+      You could ask me for the definition of the function. in this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_func_def</name>
+          <args>
+            <arg>func_1</arg>
+            <arg>func_2</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 2: ask for the struct definition ---
+      You could ask me for the definition of the structure. in this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_struct_def</name>
+          <args>
+            <arg>struct_name_1</arg>
+            <arg>struct_name_2</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 3: ask for the caller of the current function ---
+      You could ask me for the caller for the current function. (Note: you can only request one caller at a time)
+       in this case, you could respond with the following:
+       <requests>
+        <request>
+          <name>need_caller</name>
+          <args>
+            <arg>current_function_name</arg>
+          </args>
+        </request>
+      </requests>
+      --- request 4: ask for the definition of global variables ---
+      You could ask me for the definition of global variables. In this case, you could respond with the following:
+      <requests>
+        <request>
+          <name>need_global_var_def</name>
+          <args>
+            <arg>global_var_1</arg>
+            <arg>global_var_2</arg>
+          </args>
+        </request>
+      </requests>
+      ========================================
+
+      The task is to distinguish this potential bug to see if it is eliminated, not exploitable, or still a potential vulnerability.
+
+      First, we need to extract the "size of" or "length of" in the constraints and bug condition to a concrete number, or variable
+      Of course, you can request me for the definition of function/struct/variable in the project level
+      using the format at the end.
+
+      Then, we need to discuss about whether the "bug condition" can be satisified, by considering all its constraints we found.
+      specifically, we should take the following steps very carefully, step by step, to understand the effect of the range_constraints,
+      you may need to write down the intermediate results for every step to help you make the final decision:
+        - remove constraints whose postcondition is not a range to the taint; here, the taint means the variable at the sink and its intermediate propagated forms
+        - remove constraints whose postcondition limits the variable that represents another sink but not the sink we are analyzing
+        - for kernel-controlled conditions, determine the reachability by your knowledge, we assume the kernel is not compromised
+        - If the precondition contains a condition of user-controlled variables, the user can set the value to try to bypass the constraint.
+          Consider the worst case, i.e., the user can set any value to the variable.
+          If this bypass is possible, remove the whole constraint from the analysis.
+          e.g., if the precondition is "true && kernel_must_true && user_var > 0", then the constraint is not useful because the user can set any value to the user_var
+
+      If and only if the postcondition of these range constraints ensures that the exact tainted variable is sanitized with a safe range, i.e., 
+        The "bug" won't happen in any value it can take, then we can conclude the bug is eliminated.
+
+      Again, "eliminated" requires a very strong postcondition and precondition, it requires to have a raneg constraint that:
+        - the postcondition effectively limits the tainted variable to a safe range, making the bug **impossible** to happen
+        - the precondition is always satified:
+          - the precondition is always true
+          - the precondition must hold if "the precondition of the sink" is true
+
+      If the postcondition is not strong enough, we need to see the context of the sink and analyze whether the bug is exploitable.
+        Again, you can assume the hacker can set any value to the tainted variable
+
+      ========================================
+      vuln: {}
+
+      ========================================
+
+      After you finalize the analysis, i.e., you have enough information about the entire project code to finish your analysis,
+      you should update the result in our format.
+    args:
+      - get_analysis_result
+    callback:
+      - need_func_def
+      - need_struct_def
+      - need_global_var_def
+      - need_caller
+  - text: |
+      Great! Now Let's summarize our discussion, and respond in a <final_res> tag with the following format:
+      "still_a_bug", "eliminated", "likely_safe", "likely_unsafe", "not_exploitable" or "uncertain" within a <final_res> tag, e.g., <final_res>still_a_bug</final_res>
+     
