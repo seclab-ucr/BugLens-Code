@@ -1,0 +1,9 @@
+anthropic>=0.64.0
+diskcache>=5.6.3
+Flask>=3.1.1
+ollama>=0.5.3
+openai>=1.100.1
+psycopg2>=2.9.10
+PyYAML>=6.0.2
+Requests>=2.32.5
+rich>=14.1.0

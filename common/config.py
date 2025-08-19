@@ -10,7 +10,7 @@ PROJ_CONFIG = {
     },
     "msm-other":{
         "proj_dir": __MSM_DIR,
-        "cmd_dir":  __CMD_DIR + '/' + "others
+        "cmd_dir":  __CMD_DIR + '/' + "others",
     },
     "msm-other-driver-hid":{
         "proj_dir": __MSM_DIR,
