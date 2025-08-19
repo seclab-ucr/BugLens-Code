@@ -1,60 +1,61 @@
 __MSM_DIR = "../msm-android-10"
+__CMD_DIR = "../analyzers/res/suture-res"
 PROJ_CONFIG = { 
     "msm-sound":{
         "proj_dir": __MSM_DIR,
-        "cmd_file": "all_sound.cmd",
+        "cmd_file": __CMD_DIR + '/' + "sound_cmd/sound",
     },
     "msm-other":{
         "proj_dir": __MSM_DIR,
-        "cmd_dir": "../msm-android-all"
+        "cmd_dir":  __CMD_DIR + '/' + "others
     },
     "msm-other-driver-hid":{
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/driver-hid",
+        "cmd_file":  __CMD_DIR + '/' + "others/driver-hid",
     },
     "msm-other-driver-block": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/driver-block",
+        "cmd_file":  __CMD_DIR + '/' + "others/driver-block",
     },
     "msm-other-driver-i2c": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/driver-i2c",
+        "cmd_file":  __CMD_DIR + '/' + "others/driver-i2c",
     },
     "msm-other-driver-md": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/driver-md",
+        "cmd_file":  __CMD_DIR + '/' + "others/driver-md",
     },
     "msm-other-driver-rtc": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/driver-rtc",
+        "cmd_file":  __CMD_DIR + '/' + "others/driver-rtc",
     },
     "msm-other-driver-scsi": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/driver-scsi",
+        "cmd_file":  __CMD_DIR + '/' + "others/driver-scsi",
     },
     "msm-other-driver-staging": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/driver-staging",
+        "cmd_file":  __CMD_DIR + '/' + "others/driver-staging",
     },
     "msm-other-gpu": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/gpu",
+        "cmd_file":  __CMD_DIR + '/' + "others/gpu",
     },
     "msm-other-input": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/input",
+        "cmd_file":  __CMD_DIR + '/' + "others/input",
     },
     "msm-other-net": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/net",
+        "cmd_file":  __CMD_DIR + '/' + "others/net",
     },
     "msm-other-spi": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/spi",
+        "cmd_file":  __CMD_DIR + '/' + "others/spi",
     },
     "msm-other-tty": {
         "proj_dir": __MSM_DIR,
-        "cmd_file": "../msm-android-all/tty",
+        "cmd_file":  __CMD_DIR + '/' + "others/tty",
     },
     "codeql/ioctl-to-cfu": {
         "proj_dir": "../msm-4.4-revision-2017-May-07--08-33-56/src/home/kev/work/QualComm/semmle_data/projects/msm-4.4/revision-2017-May-07--08-33-56/kernel",
