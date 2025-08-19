@@ -1,30 +1,32 @@
 # logic.py
 import csv
+import os
 import re
 import psycopg2
 
 DB_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "dbname": "lmsuture",
-    "user": "lmsuture_user",
-    "password": "password1",
+    "host": os.getenv("PGHOST", "localhost"),
+    "port": int(os.getenv("PGPORT", 5432)),
+    "dbname": os.getenv("PGDATABASE", "lmsuture"),
+    "user": os.getenv("PGUSER", "lmsuture_user"),
+    "password": os.getenv("PGPASSWORD", "password1"),
 }
+
 
 GROUND_TRUTH_FILE = "ground_truth.csv"
 
 # Example: a flexible list of models you want to compare
 MODELS = [
-    "o1",
+    # "o1",
     "o3-mini",
-    "gpt-4.1",
-    "o3",
+    # "gpt-4.1",
+    # "o3",
     # "deepseek-reasoner",
-    'gemini-2.5-pro-preview-03-25',
-    "o4-mini",
-    "claude-3-7-sonnet-latest",
+    # 'gemini-2.5-pro-preview-03-25',
+    # "o4-mini",
+    # "claude-3-7-sonnet-latest",
     # "deepseek-chat"
-    "openrouter/Friendli/deepseek/deepseek-r1",
+    # "openrouter/Friendli/deepseek/deepseek-r1",
 
       # add more as needed
 ]

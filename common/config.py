@@ -1,4 +1,7 @@
-__MSM_DIR = "../msm-android-10"
+import os
+
+
+__MSM_DIR = "../../msm-android-10"
 __CMD_DIR = "../analyzers/res/suture-res"
 PROJ_CONFIG = { 
     "msm-sound":{
@@ -68,11 +71,11 @@ PROJ_CONFIG = {
 }
 
 DB_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "dbname": "lmsuture",
-    "user": "lmsuture_user",
-    "password": "password1",
+    "host": os.getenv("PGHOST", "localhost"),
+    "port": int(os.getenv("PGPORT", 5432)),
+    "dbname": os.getenv("PGDATABASE", "lmsuture"),
+    "user": os.getenv("PGUSER", "lmsuture_user"),
+    "password": os.getenv("PGPASSWORD", "password1"),
 }
 
 MODEL_ABBR = {
