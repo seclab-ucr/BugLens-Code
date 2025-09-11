@@ -325,7 +325,7 @@ def __read_func(file_path: str, line_number, proj_path):
         if cache_key in cache:
             func_def, comment_start = cache[cache_key]
             return func_def, comment_start
-
+        
     with open(os.path.join(proj_path, file_path), 'r', errors='ignore') as f:
         lines = f.readlines()
         

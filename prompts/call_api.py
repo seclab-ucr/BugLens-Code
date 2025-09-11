@@ -24,6 +24,7 @@ if 'OPENAI_API_KEY' not in os.environ:
     if os.path.exists(api_key):
         key_chain = open(api_key, 'r').read().splitlines()[0]
         os.environ['OPENAI_API_KEY'] = key_chain
+__openai_client = openai.OpenAI()
 
 claude_api_key = "../claude.key"
 if 'ANTHROPIC_API_KEY' not in os.environ:
@@ -156,6 +157,33 @@ def _gemini_do_request(model, temperature, max_tokens, formatted_messages, _retr
             return '{"ret": "failed", "response": "' + emsg[:200] + '"}'
 
     return completion.choices[0].message.content
+
+def _gpt5_do_request(model, temperature, max_tokens, formatted_messages, _retry=0, last_emsg=None):
+    try:
+        input_text = "\n".join([m["content"] for m in formatted_messages])
+        
+        completion = __openai_client.responses.create(
+            model=model,
+            input=input_text,
+            reasoning={ "effort": "high" },
+        )
+        
+        return completion.output_text
+
+    except Exception as e:
+        logging.error(e)
+        emsg = str(e)
+
+        if last_emsg is not None and emsg[:60] == last_emsg[:60]:
+            logging.info("Same error")
+            return '{"ret": "failed", "response": "' + emsg[:200] + '"}'
+
+        if _retry < __API_RETRY_LIMIT and ("context_length_exceeded" not in emsg):
+            sleep(__RETRY_TIMEOUT[_retry])
+            logging.info(f"Retrying {_retry + 1} time(s)...")
+            return _gpt5_do_request(model, temperature, max_tokens, formatted_messages, _retry + 1, emsg)
+        else:
+            return '{"ret": "failed", "response": "' + emsg[:200] + '"}'
 
 def _oai_do_request(model, temperature, max_tokens, formatted_messages, _retry=0, last_emsg=None):
     try:
@@ -362,6 +390,8 @@ def _do_request(model, temperature, max_tokens, formatted_messages, _retry=0, la
         return _claude_do_request(model, temperature, max_tokens, formatted_messages, _retry, last_emsg)
     elif "gemini" in model:
         return _gemini_do_request(model, temperature, max_tokens, formatted_messages, _retry, last_emsg)
+    elif "gpt-5" in model: 
+        return _gpt5_do_request(model, temperature, max_tokens, formatted_messages, _retry, last_emsg)
     else:
         return _oai_do_request(model, temperature, max_tokens, formatted_messages, _retry, last_emsg)
 

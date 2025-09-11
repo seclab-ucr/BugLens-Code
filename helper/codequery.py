@@ -123,7 +123,7 @@ def __get_func_cq(project_path, function_name):
         else:
             base_dir_pattern = os.path.basename(project_path)
             relative_path_start_index = line.find(
-                base_dir_pattern) + len(base_dir_pattern)
+                base_dir_pattern) + len(base_dir_pattern)+1
             relative_path = line[relative_path_start_index:].split(':')
             # return relative_path
             res.append(relative_path)
@@ -183,7 +183,7 @@ def __get_struct_cq(project_path, struct_name):
         else:
             base_dir_pattern = os.path.basename(project_path)
             relative_path_start_index = line.find(
-                base_dir_pattern) + len(base_dir_pattern)
+                base_dir_pattern) + len(base_dir_pattern)+1
             relative_path = line[relative_path_start_index:].split(':')
             # return relative_path
             res.append(relative_path)
@@ -230,7 +230,7 @@ def __get_union_cq(project_path, union_name):
         else:
             base_dir_pattern = os.path.basename(project_path)
             relative_path_start_index = line.find(
-                base_dir_pattern) + len(base_dir_pattern)
+                base_dir_pattern) + len(base_dir_pattern)+1
             relative_path = line[relative_path_start_index:].split(':')
             res.append(relative_path)
             
@@ -300,7 +300,7 @@ def __get_global_var_cq(project_path, var_name, grep_pattern='struct'):
         else:
             base_dir_pattern = os.path.basename(project_path)
             relative_path_start_index = line.find(
-                base_dir_pattern) + len(base_dir_pattern)
+                base_dir_pattern) + len(base_dir_pattern)+1
             relative_path = line[relative_path_start_index:].split(':')
             # return relative_path
             res.append(relative_path)

@@ -27,7 +27,7 @@ MODELS = [
     # "claude-3-7-sonnet-latest",
     # "deepseek-chat"
     # "openrouter/Friendli/deepseek/deepseek-r1",
-
+    "gpt-5"
       # add more as needed
 ]
 
